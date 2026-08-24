@@ -140,7 +140,7 @@ class ReservationService:
                 )
                 if reservation is None:
                     raise ReservationNotFoundError(reservation_id)
-                await self._expire_if_due(reservations, stock, reservation)
+                expired_now = await self._expire_if_due(reservations, stock, reservation)
 
                 # сначала переход (row lock на резерве сериализует конкурентов),
                 # и только при выигрыше — компенсация остатка
@@ -150,6 +150,9 @@ class ReservationService:
                     )
                 )
                 if not won:
+                    if expired_now:
+                        # ленивая экспирация не должна откатиться вместе с 409
+                        await session.commit()
                     fresh = await reservations.get_by_id(reservation_id, fresh=True)
                     current = fresh.status.value if fresh is not None else "UNKNOWN"
                     logger.warning(
@@ -186,13 +189,15 @@ class ReservationService:
         reservations: ReservationRepository,
         stock: StockRepository,
         reservation: Reservation,
-    ) -> None:
+    ) -> bool:
         """Ленивая экспирация: PENDING с истёкшим expires_at переводится в EXPIRED
-        (условным UPDATE — гонко-устойчиво) и остаток возвращается."""
+        (условным UPDATE — гонко-устойчиво) и остаток возвращается.
+
+        True — экспирация выполнена в ЭТОЙ транзакции (её нужно закоммитить)."""
         if reservation.status is not ReservationStatus.PENDING:
-            return
+            return False
         if reservation.expires_at is None or reservation.expires_at > datetime.now(UTC):
-            return
+            return False
         won = await reservations.update_status(
             reservation.id, ReservationStatus.PENDING, ReservationStatus.EXPIRED
         )
@@ -210,7 +215,8 @@ class ReservationService:
                 to_status=ReservationStatus.EXPIRED.value,
                 reason="lazy_expiration",
             )
-        else:
-            fresh = await reservations.get_by_id(reservation.id, with_items=True, fresh=True)
-            if fresh is not None:
-                reservation.status = fresh.status
+            return True
+        fresh = await reservations.get_by_id(reservation.id, with_items=True, fresh=True)
+        if fresh is not None:
+            reservation.status = fresh.status
+        return False
