@@ -1,0 +1,42 @@
+# Версия PostgreSQL прибита проектом: postgres:16-alpine (менять только синхронно
+# с фикстурой testcontainers и POSTGRES_IMAGE в .env.example).
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reserve}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reserve}
+      POSTGRES_DB: ${POSTGRES_DB:-reserve}
+    ports:
+      - "127.0.0.1:5439:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  migrate:
+    build: .
+    command: alembic upgrade head
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-reserve}:${POSTGRES_PASSWORD:-reserve}@postgres:5432/${POSTGRES_DB:-reserve}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-reserve}:${POSTGRES_PASSWORD:-reserve}@postgres:5432/${POSTGRES_DB:-reserve}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
