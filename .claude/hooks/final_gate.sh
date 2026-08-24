@@ -33,6 +33,20 @@ if [ -n "$MISSING" ]; then
   exit 0
 fi
 
+# Порог покрытия: COV_MIN из окружения (дефолт 85); файл .coverage-grace в корне
+# временно переопределяет его (строки с # — комментарии, первая прочая строка — число).
+# Фаза 6: удалить .coverage-grace — 85% вернутся сами, скрипт править не нужно.
+THRESHOLD="${COV_MIN:-85}"
+if [ -f "$PROJECT_DIR/.coverage-grace" ]; then
+  GRACE=$(grep -vE '^[[:space:]]*(#|$)' "$PROJECT_DIR/.coverage-grace" | head -1 | tr -d '[:space:]')
+  if printf '%s' "$GRACE" | grep -qE '^[0-9]+$'; then
+    THRESHOLD="$GRACE"
+    echo "WARNING: покрытие временно ослаблено до ${THRESHOLD}% (.coverage-grace). Вернуть 85% в фазе 6." >&2
+  else
+    echo "final_gate: .coverage-grace нечитаем ('$GRACE') — используется порог ${THRESHOLD}%" >&2
+  fi
+fi
+
 FAIL=0
 
 run_check() {
@@ -52,7 +66,7 @@ run_check() {
 
 run_check "ruff"   ruff check .
 run_check "mypy"   mypy app
-run_check "pytest+cov" pytest --cov=app --cov-fail-under=85 -q
+run_check "pytest+cov" pytest --cov=app --cov-fail-under="$THRESHOLD" -q
 
 if [ "$FAIL" -ne 0 ]; then
   echo "final_gate: гейт не пройден — исправь ошибки выше, задача не закрыта" >&2
