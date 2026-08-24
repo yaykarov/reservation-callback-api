@@ -59,19 +59,28 @@ class ReservationRepository(BaseRepository):
         await self._session.flush()
 
     async def get_by_id(
-        self, reservation_id: uuid.UUID, *, with_items: bool = False
+        self, reservation_id: uuid.UUID, *, with_items: bool = False, fresh: bool = False
     ) -> Reservation | None:
         stmt = select(Reservation).where(Reservation.id == reservation_id)
         if with_items:
-            stmt = stmt.options(selectinload(Reservation.items))
+            stmt = stmt.options(
+                selectinload(Reservation.items).selectinload(ReservationItem.product)
+            )
+        if fresh:
+            # обойти identity map: после проигранного условного UPDATE нужен статус из БД
+            stmt = stmt.execution_options(populate_existing=True)
         return (await self._session.scalars(stmt)).one_or_none()
 
     async def get_by_idempotency_key(
-        self, idempotency_key: str, *, with_items: bool = False
+        self, idempotency_key: str, *, with_items: bool = False, fresh: bool = False
     ) -> Reservation | None:
         stmt = select(Reservation).where(Reservation.idempotency_key == idempotency_key)
         if with_items:
-            stmt = stmt.options(selectinload(Reservation.items))
+            stmt = stmt.options(
+                selectinload(Reservation.items).selectinload(ReservationItem.product)
+            )
+        if fresh:
+            stmt = stmt.execution_options(populate_existing=True)
         return (await self._session.scalars(stmt)).one_or_none()
 
     async def update_status(
@@ -92,7 +101,9 @@ class ReservationRepository(BaseRepository):
             .values(status=new)
             .returning(Reservation.id)
         )
-        result = await self._session.execute(stmt)
+        # synchronize_session=False: стратегия "evaluate" присвоила бы объекту в сессии
+        # новый статус даже при 0 обновлённых строк; синхронизацию делает сервис явно.
+        result = await self._session.execute(stmt, execution_options={"synchronize_session": False})
         return result.scalar_one_or_none() is not None
 
     async def add_event(

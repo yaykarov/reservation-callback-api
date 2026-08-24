@@ -7,7 +7,7 @@ read-modify-write в Python отсутствует по построению. П
 """
 
 import uuid
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 
 from sqlalchemy import update
 
@@ -62,11 +62,26 @@ class StockRepository(BaseRepository):
         уже выполненные reserve() этого вызова остаются в её незакоммиченном
         состоянии и сами по себе не отменяются.
         """
+        return await self._apply_many(items, self.reserve)
+
+    async def release_many(self, items: Iterable[tuple[uuid.UUID, int]]) -> uuid.UUID | None:
+        """Вернуть несколько позиций (cancel/expire) в том же ASC-порядке, что и reserve_many."""
+        return await self._apply_many(items, self.release)
+
+    async def commit_many(self, items: Iterable[tuple[uuid.UUID, int]]) -> uuid.UUID | None:
+        """Списать несколько подтверждённых позиций в том же ASC-порядке."""
+        return await self._apply_many(items, self.commit_reservation)
+
+    async def _apply_many(
+        self,
+        items: Iterable[tuple[uuid.UUID, int]],
+        op: Callable[[uuid.UUID, int], Awaitable[bool]],
+    ) -> uuid.UUID | None:
         collapsed: dict[uuid.UUID, int] = {}
         for product_id, qty in items:
             collapsed[product_id] = collapsed.get(product_id, 0) + qty
         ordered = sorted(collapsed.items())  # ASC по product_id — анти-дедлок
         for product_id, qty in ordered:
-            if not await self.reserve(product_id, qty):
+            if not await op(product_id, qty):
                 return product_id
         return None
