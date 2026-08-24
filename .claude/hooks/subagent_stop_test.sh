@@ -7,6 +7,7 @@ cat >/dev/null 2>&1 || true  # съесть stdin, содержимое не н�
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
 cd "$PROJECT_DIR" 2>/dev/null || exit 0
+[ -d "$PROJECT_DIR/.venv/bin" ] && PATH="$PROJECT_DIR/.venv/bin:$PATH"
 
 if ! command -v pytest >/dev/null 2>&1; then
   echo "subagent_stop_test: pytest не установлен — прогон пропущен" >&2
