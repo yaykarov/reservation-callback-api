@@ -29,3 +29,7 @@ coverage.xml
 
 # Docker
 *.pid
+
+# Local artifacts
+*.db
+scratchpad/

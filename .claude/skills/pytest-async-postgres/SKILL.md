@@ -7,6 +7,11 @@ description: Test infrastructure - testcontainers PostgreSQL fixture, per-test t
 
 **Когда применять:** conftest.py, фикстуры БД/клиента, интеграционные и API-тесты.
 
+**Версия Postgres прибита: `postgres:16-alpine`.** Ровно этот образ в фикстуре
+testcontainers, в docker-compose.yml и в `POSTGRES_IMAGE` из `.env.example`.
+Другие теги (16, 17, latest) не использовать; менять версию — только синхронно
+во всех трёх местах.
+
 ## Контейнер + миграции (session scope)
 
 ```python

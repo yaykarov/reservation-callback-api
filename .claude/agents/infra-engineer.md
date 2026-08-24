@@ -19,7 +19,7 @@ model: sonnet
 - `migrate`: one-shot сервис из образа приложения, команда `alembic upgrade head`, `depends_on: postgres: condition: service_healthy`, `restart: "no"`;
 - `api`: `depends_on: migrate: condition: service_completed_successfully`;
 - переменные — только через `env_file: .env` / environment из `.env.example`, никаких секретов в yaml;
-- порт postgres наружу — только на localhost (`127.0.0.1:5432:5432`).
+- порт postgres наружу — только на localhost (`127.0.0.1:5439:5432`).
 
 **.dockerignore**: `.git`, `.venv`, `tests/`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`, `htmlcov`, `.env*` (кроме ничего — .env.example в образ тоже не нужен), `__pycache__`.
 

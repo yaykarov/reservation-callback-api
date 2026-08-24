@@ -1,6 +1,9 @@
 # Callback API для управления резервированием товаров
 
 Асинхронное API: Python 3.12, FastAPI, SQLAlchemy 2.0 (async), asyncpg, Alembic, PostgreSQL.
+Версия PostgreSQL прибита: **postgres:16-alpine** — ровно этот образ в docker-compose.yml,
+в фикстуре testcontainers и в `POSTGRES_IMAGE` (.env.example). Менять только синхронно везде.
+Dev-БД слушает на хосте порт **5439** (`localhost:5439`, published-порт compose тоже 5439:5432).
 Принимает callback-запросы от внешних сервисов на резервирование товаров, отдаёт статус резерва.
 
 ## Доменные инварианты (КРИТИЧНО — нарушение любого из них = баг)

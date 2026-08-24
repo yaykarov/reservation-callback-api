@@ -15,7 +15,7 @@ services:
     image: postgres:16-alpine
     env_file: .env
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5439:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
